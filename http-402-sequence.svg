@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1200" height="780" viewBox="0 0 1200 780" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font: bold 22px sans-serif; }
+      .subtitle { font: 14px sans-serif; fill: #333; }
+      .lane-title { font: bold 16px sans-serif; }
+      .label { font: 13px monospace; }
+      .small { font: 12px monospace; }
+      .box { fill: #f7f9fc; stroke: #4a6fa5; stroke-width: 1.5; }
+      .note { fill: #fff8e1; stroke: #de9e34; }
+      .arrow { stroke: #333; stroke-width: 1.5; marker-end: url(#arrowhead); }
+      .lifeline { stroke: #bbb; stroke-dasharray: 6 6; }
+      .badge { fill: #e8eef7; stroke: #4a6fa5; }
+      .code { font: 12px monospace; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+            refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="600" y="36" text-anchor="middle" class="title">HTTP 402 Payment Required — 典型交互（示意）</text>
+  <text x="600" y="58" text-anchor="middle" class="subtitle">说明：客户端请求资源 → 服务器检测付费状态 → 返回 402 并引导支付 → 客户端支付并重试 → 成功访问</text>
+
+  <!-- Lanes -->
+  <!-- Client -->
+  <rect x="70" y="80" width="240" height="50" rx="8" class="box"/>
+  <text x="190" y="110" text-anchor="middle" class="lane-title">Client（浏览器/应用）</text>
+  <line x1="190" y1="140" x2="190" y2="740" class="lifeline"/>
+
+  <!-- Server -->
+  <rect x="480" y="80" width="240" height="50" rx="8" class="box"/>
+  <text x="600" y="110" text-anchor="middle" class="lane-title">Server（API/内容服务）</text>
+  <line x1="600" y1="140" x2="600" y2="740" class="lifeline"/>
+
+  <!-- Payment Provider -->
+  <rect x="890" y="80" width="240" height="50" rx="8" class="box"/>
+  <text x="1010" y="110" text-anchor="middle" class="lane-title">Payment Provider（支付网关）</text>
+  <line x1="1010" y1="140" x2="1010" y2="740" class="lifeline"/>
+
+  <!-- Step 1: Request -->
+  <line x1="190" y1="170" x2="600" y2="170" class="arrow"/>
+  <text x="390" y="162" text-anchor="middle" class="label">1. GET /premium/resource</text>
+  <text x="390" y="180" text-anchor="middle" class="small">Authorization: Bearer …</text>
+
+  <!-- Step 2: Server checks billing -->
+  <rect x="510" y="200" width="180" height="36" rx="6" class="badge"/>
+  <text x="600" y="222" text-anchor="middle" class="small">检查计费：额度/订阅/试用</text>
+
+  <!-- Step 3: 402 Response -->
+  <line x1="600" y1="260" x2="190" y2="260" class="arrow"/>
+  <text x="390" y="252" text-anchor="middle" class="label">2. HTTP 402 Payment Required</text>
+  <rect x="95" y="275" width="190" height="110" rx="6" class="note"/>
+  <text x="190" y="295" text-anchor="middle" class="code">{</text>
+  <text x="190" y="311" text-anchor="middle" class="code">"error": "Payment required",</text>
+  <text x="190" y="327" text-anchor="middle" class="code">"balance": 0,</text>
+  <text x="190" y="343" text-anchor="middle" class="code">"payment_url": "https://pay/..."</text>
+  <text x="190" y="359" text-anchor="middle" class="code">}</text>
+
+  <!-- Step 4: Client opens payment page -->
+  <line x1="190" y1="410" x2="1010" y2="410" class="arrow"/>
+  <text x="600" y="402" text-anchor="middle" class="label">3. 打开支付页面 / 创建订单</text>
+
+  <!-- Step 5: Payment provider → Server (webhook) -->
+  <line x1="1010" y1="460" x2="600" y2="460" class="arrow"/>
+  <text x="805" y="452" text-anchor="middle" class="label">4. Webhook: 支付成功通知(orderId, receipt)</text>
+
+  <!-- Step 6: Client retries -->
+  <line x1="190" y1="510" x2="600" y2="510" class="arrow"/>
+  <text x="390" y="502" text-anchor="middle" class="label">5. 重试请求（或带计费凭证）</text>
+  <text x="390" y="520" text-anchor="middle" class="small">GET /premium/resource</text>
+
+  <!-- Step 7: 200 OK -->
+  <line x1="600" y1="560" x2="190" y2="560" class="arrow"/>
+  <text x="390" y="552" text-anchor="middle" class="label">6. 200 OK + 内容</text>
+
+  <!-- Notes -->
+  <rect x="85" y="610" width="1030" height="120" rx="10" class="note"/>
+  <text x="100" y="634" class="small">• 402 是保留状态码，语义为“需要支付”，常用于配额用尽/欠费/未订阅的自定义场景。</text>
+  <text x="100" y="654" class="small">• 客户端动作：提示用户支付 → 支付成功后重试；服务端建议在 402 响应体中返回 payment_url / 余额 / 引导信息。</text>
+  <text x="100" y="674" class="small">• 安全性：对账以服务端为准（Webhook 需验签/防重放）；幂等用 Idempotency-Key；重试策略与 429 区分开。</text>
+  <text x="100" y="694" class="small">• 对比：401 未认证（需登录）、403 禁止访问（权限不足）、429 频率限制（需等待），402 是“已认证但需要付费”。</text>
+
+</svg>

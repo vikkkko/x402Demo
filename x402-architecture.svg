@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" style="background: white;">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#64748b" />
+    </marker>
+    <filter id="shadow">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text x="600" y="40" font-size="28" font-weight="bold" text-anchor="middle" fill="#1f2937">
+    x402 系统架构与组件关系
+  </text>
+
+  <!-- Client Component -->
+  <g id="client" filter="url(#shadow)">
+    <rect x="100" y="150" width="250" height="200" rx="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="3"/>
+    <text x="225" y="190" font-size="20" font-weight="bold" text-anchor="middle" fill="#1e3a8a">客户端 / 买家</text>
+    <text x="225" y="215" font-size="14" text-anchor="middle" fill="#1e40af">(Client / Payer)</text>
+
+    <rect x="120" y="235" width="210" height="100" rx="6" fill="white" stroke="#3b82f6" stroke-width="1"/>
+    <text x="225" y="255" font-size="13" font-weight="bold" text-anchor="middle" fill="#1e3a8a">职责：</text>
+    <text x="225" y="275" font-size="11" text-anchor="middle" fill="#1e40af">• 请求受保护的 API</text>
+    <text x="225" y="292" font-size="11" text-anchor="middle" fill="#1e40af">• 创建 EIP-712 签名</text>
+    <text x="225" y="309" font-size="11" text-anchor="middle" fill="#1e40af">• 发送支付凭证</text>
+    <text x="225" y="326" font-size="11" text-anchor="middle" fill="#1e40af">• 无需支付 Gas 费</text>
+  </g>
+
+  <!-- Merchant Server Component -->
+  <g id="merchant" filter="url(#shadow)">
+    <rect x="475" y="150" width="250" height="200" rx="12" fill="#fef3c7" stroke="#f59e0b" stroke-width="3"/>
+    <text x="600" y="190" font-size="20" font-weight="bold" text-anchor="middle" fill="#78350f">商家服务器</text>
+    <text x="600" y="215" font-size="14" text-anchor="middle" fill="#92400e">(Merchant Server)</text>
+
+    <rect x="495" y="235" width="210" height="100" rx="6" fill="white" stroke="#f59e0b" stroke-width="1"/>
+    <text x="600" y="255" font-size="13" font-weight="bold" text-anchor="middle" fill="#78350f">职责：</text>
+    <text x="600" y="275" font-size="11" text-anchor="middle" fill="#92400e">• 提供受保护的 API</text>
+    <text x="600" y="292" font-size="11" text-anchor="middle" fill="#92400e">• 返回 402 支付要求</text>
+    <text x="600" y="309" font-size="11" text-anchor="middle" fill="#92400e">• 调用 Facilitator 验证</text>
+    <text x="600" y="326" font-size="11" text-anchor="middle" fill="#92400e">• 验证通过后提供服务</text>
+  </g>
+
+  <!-- Facilitator Component -->
+  <g id="facilitator" filter="url(#shadow)">
+    <rect x="850" y="150" width="250" height="200" rx="12" fill="#dcfce7" stroke="#22c55e" stroke-width="3"/>
+    <text x="975" y="190" font-size="20" font-weight="bold" text-anchor="middle" fill="#14532d">协调器</text>
+    <text x="975" y="215" font-size="14" text-anchor="middle" fill="#166534">(Facilitator)</text>
+
+    <rect x="870" y="235" width="210" height="100" rx="6" fill="white" stroke="#22c55e" stroke-width="1"/>
+    <text x="975" y="255" font-size="13" font-weight="bold" text-anchor="middle" fill="#14532d">职责：</text>
+    <text x="975" y="275" font-size="11" text-anchor="middle" fill="#166534">• 验证支付签名 (/verify)</text>
+    <text x="975" y="292" font-size="11" text-anchor="middle" fill="#166534">• 结算到链上 (/settle)</text>
+    <text x="975" y="309" font-size="11" text-anchor="middle" fill="#166534">• 代付 Gas 费用</text>
+    <text x="975" y="326" font-size="11" text-anchor="middle" fill="#166534">• 防止双花和重放攻击</text>
+  </g>
+
+  <!-- Blockchain Component -->
+  <g id="blockchain" filter="url(#shadow)">
+    <rect x="475" y="500" width="250" height="200" rx="12" fill="#f3e8ff" stroke="#a855f7" stroke-width="3"/>
+    <text x="600" y="540" font-size="20" font-weight="bold" text-anchor="middle" fill="#581c87">区块链网络</text>
+    <text x="600" y="565" font-size="14" text-anchor="middle" fill="#6b21a8">(Blockchain)</text>
+
+    <rect x="495" y="585" width="210" height="100" rx="6" fill="white" stroke="#a855f7" stroke-width="1"/>
+    <text x="600" y="605" font-size="13" font-weight="bold" text-anchor="middle" fill="#581c87">职责：</text>
+    <text x="600" y="625" font-size="11" text-anchor="middle" fill="#6b21a8">• 执行代币转账</text>
+    <text x="600" y="642" font-size="11" text-anchor="middle" fill="#6b21a8">• USDC.transferWithAuthorization</text>
+    <text x="600" y="659" font-size="11" text-anchor="middle" fill="#6b21a8">• 验证并记录 nonce</text>
+    <text x="600" y="676" font-size="11" text-anchor="middle" fill="#6b21a8">• 最终确认交易</text>
+  </g>
+
+  <!-- Arrows and Labels -->
+
+  <!-- Client to Merchant -->
+  <line x1="350" y1="250" x2="475" y2="250" stroke="#3b82f6" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="412" y="240" font-size="12" font-weight="bold" text-anchor="middle" fill="#1e40af">① HTTP 请求</text>
+  <text x="412" y="255" font-size="10" text-anchor="middle" fill="#64748b">GET /api/protected</text>
+
+  <line x1="475" y1="280" x2="350" y2="280" stroke="#ef4444" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="412" y="295" font-size="12" font-weight="bold" text-anchor="middle" fill="#dc2626">② 402 响应</text>
+  <text x="412" y="310" font-size="10" text-anchor="middle" fill="#64748b">+ 支付要求</text>
+
+  <!-- Client to Merchant (with payment) -->
+  <line x1="350" y1="320" x2="475" y2="320" stroke="#22c55e" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="412" y="335" font-size="12" font-weight="bold" text-anchor="middle" fill="#166534">④ 带签名请求</text>
+  <text x="412" y="350" font-size="10" text-anchor="middle" fill="#64748b">X-Payment Header</text>
+
+  <!-- Merchant to Facilitator -->
+  <line x1="725" y1="230" x2="850" y2="230" stroke="#f59e0b" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="787" y="220" font-size="12" font-weight="bold" text-anchor="middle" fill="#92400e">⑤ 验证请求</text>
+  <text x="787" y="235" font-size="10" text-anchor="middle" fill="#64748b">POST /verify</text>
+
+  <line x1="850" y1="260" x2="725" y2="260" stroke="#22c55e" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="787" y="275" font-size="12" font-weight="bold" text-anchor="middle" fill="#166534">验证响应</text>
+  <text x="787" y="290" font-size="10" text-anchor="middle" fill="#64748b">{isValid: true}</text>
+
+  <!-- Merchant to Client (success) -->
+  <rect x="360" y="365" width="100" height="35" rx="6" fill="#dcfce7" stroke="#22c55e" stroke-width="2"/>
+  <text x="410" y="385" font-size="12" font-weight="bold" text-anchor="middle" fill="#166534">⑥ 200 OK</text>
+  <text x="410" y="397" font-size="9" text-anchor="middle" fill="#166534">返回内容</text>
+
+  <!-- Facilitator to Blockchain (async) -->
+  <line x1="975" y1="350" x2="650" y2="500" stroke="#a855f7" stroke-width="3" stroke-dasharray="10,5" marker-end="url(#arrow)"/>
+  <text x="812" y="410" font-size="12" font-weight="bold" text-anchor="middle" fill="#6b21a8">⑦ 异步结算</text>
+  <text x="812" y="425" font-size="10" text-anchor="middle" fill="#64748b">POST /settle</text>
+  <text x="812" y="440" font-size="10" text-anchor="middle" fill="#64748b">→ 提交到链上</text>
+
+  <!-- Legend Box -->
+  <g id="legend">
+    <rect x="100" y="420" width="300" height="260" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2" filter="url(#shadow)"/>
+    <text x="250" y="455" font-size="16" font-weight="bold" text-anchor="middle" fill="#1f2937">数据流说明</text>
+
+    <!-- Step annotations -->
+    <circle cx="120" cy="485" r="12" fill="#3b82f6"/>
+    <text x="120" y="491" font-size="11" font-weight="bold" text-anchor="middle" fill="white">1</text>
+    <text x="145" y="491" font-size="11" fill="#334155">客户端请求资源（无支付）</text>
+
+    <circle cx="120" cy="515" r="12" fill="#ef4444"/>
+    <text x="120" y="521" font-size="11" font-weight="bold" text-anchor="middle" fill="white">2</text>
+    <text x="145" y="521" font-size="11" fill="#334155">服务器返回 402 + 支付要求</text>
+
+    <circle cx="120" cy="545" r="12" fill="#8b5cf6"/>
+    <text x="120" y="551" font-size="11" font-weight="bold" text-anchor="middle" fill="white">3</text>
+    <text x="145" y="551" font-size="11" fill="#334155">客户端创建 EIP-712 签名（链下）</text>
+
+    <circle cx="120" cy="575" r="12" fill="#22c55e"/>
+    <text x="120" y="581" font-size="11" font-weight="bold" text-anchor="middle" fill="white">4</text>
+    <text x="145" y="581" font-size="11" fill="#334155">客户端发送带签名的请求</text>
+
+    <circle cx="120" cy="605" r="12" fill="#f59e0b"/>
+    <text x="120" y="611" font-size="11" font-weight="bold" text-anchor="middle" fill="white">5</text>
+    <text x="145" y="611" font-size="11" fill="#334155">服务器请求 Facilitator 验证</text>
+
+    <circle cx="120" cy="635" r="12" fill="#22c55e"/>
+    <text x="120" y="641" font-size="11" font-weight="bold" text-anchor="middle" fill="white">6</text>
+    <text x="145" y="641" font-size="11" fill="#334155">验证通过，服务器返回内容</text>
+
+    <circle cx="120" cy="665" r="12" fill="#a855f7"/>
+    <text x="120" y="671" font-size="11" font-weight="bold" text-anchor="middle" fill="white">7</text>
+    <text x="145" y="671" font-size="11" fill="#334155">Facilitator 异步结算到区块链</text>
+  </g>
+
+  <!-- Key Features Box -->
+  <g id="features">
+    <rect x="800" y="420" width="300" height="260" rx="12" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" filter="url(#shadow)"/>
+    <text x="950" y="455" font-size="16" font-weight="bold" text-anchor="middle" fill="#78350f">核心特性</text>
+
+    <g transform="translate(820, 475)">
+      <text x="0" y="0" font-size="13" font-weight="bold" fill="#92400e">⚡ 即时验证</text>
+      <text x="10" y="18" font-size="10" fill="#78350f">• 链下签名，无需等待区块确认</text>
+      <text x="10" y="32" font-size="10" fill="#78350f">• 验证时间 ~200ms</text>
+
+      <text x="0" y="55" font-size="13" font-weight="bold" fill="#92400e">💰 Gas-free 体验</text>
+      <text x="10" y="73" font-size="10" fill="#78350f">• 客户端无需支付 Gas</text>
+      <text x="10" y="87" font-size="10" fill="#78350f">• Facilitator 代付链上费用</text>
+
+      <text x="0" y="110" font-size="13" font-weight="bold" fill="#92400e">🔒 安全可靠</text>
+      <text x="10" y="128" font-size="10" fill="#78350f">• EIP-712 标准签名</text>
+      <text x="10" y="142" font-size="10" fill="#78350f">• Nonce 防重放攻击</text>
+      <text x="10" y="156" font-size="10" fill="#78350f">• 时间窗口验证</text>
+
+      <text x="0" y="179" font-size="13" font-weight="bold" fill="#92400e">🚀 高性能</text>
+      <text x="10" y="197" font-size="10" fill="#78350f">• 异步结算不阻塞响应</text>
+      <text x="10" y="211" font-size="10" fill="#78350f">• 适合小额高频支付</text>
+      <text x="10" y="225" font-size="10" fill="#78350f">• 支持微支付场景</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <text x="600" y="770" font-size="11" text-anchor="middle" fill="#64748b">
+    x402 协议实现 HTTP 原生的即时支付能力 • Base Sepolia USDC • EIP-3009 标准
+  </text>
+</svg>
