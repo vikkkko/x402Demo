@@ -1,49 +1,52 @@
 const axios = require('axios');
 
 /**
- * x402 支付中间件
- * 实现 HTTP 402 Payment Required 协议
+ * x402 v2 支付中间件 (多 Token 版本)
+ * 实现 HTTP 402 Payment Required v2 协议
  */
 class X402Middleware {
   constructor(config) {
     this.facilitatorUrl = config.facilitatorUrl;
-    this.network = config.network;
     this.payToAddress = config.payToAddress;
     this.pricePerRequest = config.pricePerRequest;
-    this.currency = config.currency || 'USDC';
-    this.currencyAddress = config.currencyAddress;
-    this.scheme = config.scheme || 'exact';
+    this.supportedTokens = config.supportedTokens || [];
+    this.scheme = 'exact';
+
+    if (this.supportedTokens.length === 0) {
+      throw new Error('No tokens configured in X402Middleware');
+    }
   }
 
   /**
-   * Express 中间件函数
+   * Express 中间件函数 (v2 多 Token)
    */
   middleware() {
     return async (req, res, next) => {
-      // 检查请求头中是否包含支付凭证
-      const paymentHeader = req.headers['x-payment'];
+      const resource = `${req.protocol}://${req.get('host')}${req.originalUrl || req.path}`;
 
-      if (!paymentHeader) {
+      // 检查 v2 支付凭证头
+      const paymentSignatureHeader = req.headers['payment-signature'];
+
+      if (!paymentSignatureHeader) {
         // 没有支付凭证，返回 402 Payment Required
-        return this.sendPaymentRequired(req, res);
+        return this.sendPaymentRequired(req, res, resource);
       }
 
       // 解析支付凭证
       let payment;
       try {
-        payment = typeof paymentHeader === 'string'
-          ? JSON.parse(paymentHeader)
-          : paymentHeader;
+        payment = typeof paymentSignatureHeader === 'string'
+          ? JSON.parse(paymentSignatureHeader)
+          : paymentSignatureHeader;
       } catch (error) {
         return res.status(400).json({
-          error: 'Invalid payment header format',
+          error: 'Invalid payment signature format',
           message: error.message
         });
       }
-      
-      // 验证支付 "http://localhost:3000/api/protected",// 
+
+      // 验证支付
       try {
-        const resource = "http://localhost:3000/api/protected";// req.path;
         const isValid = await this.verifyPayment(payment, resource);
 
         if (!isValid) {
@@ -56,7 +59,6 @@ class X402Middleware {
         // 支付有效，异步结算并继续处理请求
         this.settlePayment(payment, resource).catch(err => {
           console.error('Settlement failed:', err);
-          // 结算失败不影响当前请求，但应该记录日志
         });
 
         // 将支付信息附加到请求对象
@@ -74,83 +76,153 @@ class X402Middleware {
   }
 
   /**
-   * 发送 402 Payment Required 响应
+   * 发送 402 Payment Required v2 响应
    */
-  sendPaymentRequired(req, res) {
-    const amount = Math.floor(this.pricePerRequest * 1000000);
+  sendPaymentRequired(req, res, resource) {
+    const amount = Math.floor(this.pricePerRequest * 1000000).toString();
+    const memo = resource || req.path;
 
-    // 构造 X-Accept-Payment 头
-    const acceptPaymentHeader = [
-      '1 x402',
-      `facilitators="${this.facilitatorUrl}"`,
-      `schemes="${this.scheme}"`,
-      `networks="${this.network}"`,
-      `currencies="${this.currency}:${this.currencyAddress}"`,
-      `amount="${amount}"`,
-      `resource="${req.path}"`,
-      `payTo="${this.payToAddress}"`
-    ].join('; ');
+    // v2 resourceInfo
+    const resourceInfo = {
+      resource: resource,
+      mimeType: 'application/json',
+      method: req.method
+    };
+
+    // v2 accepts 数组：为每种 token 创建一条路线
+    const accepts = this.supportedTokens.map((token) => {
+      const caip2Network = `eip155:${token.chainId}`;
+      return {
+        scheme: this.scheme,
+        network: caip2Network,
+        asset: token.address,
+        amount: token.amount || amount,
+        payTo: this.payToAddress,
+        description: token.description,
+        timeoutSeconds: 120,
+        meta: {
+          domainName: token.domainName,
+          domainVersion: token.domainVersion,
+          contractType: token.contractType,
+          explorerUrl: token.explorerUrl,
+          memo: memo
+        }
+      };
+    });
+
+    // 收集所有支持的网络
+    const supportedNetworks = accepts.map(route => route.network);
+
+    // v2 PAYMENT-REQUIRED 头内容
+    const paymentRequired = {
+      version: 2,
+      resourceInfo: resourceInfo,
+      accepts: accepts,
+      facilitators: [
+        {
+          url: this.facilitatorUrl,
+          networks: supportedNetworks
+        }
+      ]
+    };
+
+    // Base64 编码
+    const paymentRequiredBase64 = Buffer.from(JSON.stringify(paymentRequired)).toString('base64');
+
+    // 构建 contractMetadata（取第一个 token 作为默认值）
+    const firstRoute = accepts[0];
+    const firstToken = this.supportedTokens[0];
+    const contractMetadata = {
+      domainName: firstRoute.meta.domainName,
+      domainVersion: firstRoute.meta.domainVersion,
+      chainId: firstToken.chainId,
+      verifyingContract: firstRoute.asset,
+      contractType: firstRoute.meta.contractType,
+      explorerUrl: firstRoute.meta.explorerUrl,
+      caip2Network: firstRoute.network
+    };
+
+    // v2 响应体
+    const responseBody = {
+      error: 'Payment Required',
+      message: 'This endpoint requires payment',
+      v2: {
+        version: 2,
+        resourceInfo: resourceInfo,
+        accepts: accepts
+      },
+      contractMetadata: contractMetadata
+    };
 
     res.status(402)
-      .header('X-Accept-Payment', acceptPaymentHeader)
-      .json({
-        error: 'Payment Required',
-        message: 'This endpoint requires payment',
-        payment: {
-          amount: this.pricePerRequest,
-          currency: this.currency,
-          network: this.network,
-          payTo: this.payToAddress,
-          facilitator: this.facilitatorUrl
-        }
-      });
+      .header('PAYMENT-REQUIRED', paymentRequiredBase64)
+      .json(responseBody);
   }
 
   /**
-   * 验证支付签名
+   * 验证支付签名 (v2)
    */
   async verifyPayment(payment, resource) {
     try {
-      console.log('Received payment.payment.v:', payment.payment.v, 'type:', typeof payment.payment.v);
+      console.log('Received v2 payment');
 
+      // 提取 v2 支付载荷
+      const paymentData = payment.paymentPayload?.payload || {};
+      const authData = paymentData.authorization || {};
+
+      const memo = payment.memo || authData.memo || resource;
+      const signature = paymentData.signature;
+
+      if (!signature || !authData.from) {
+        throw new Error('Invalid payment structure: missing signature or from address');
+      }
+
+      // 从客户端支付中提取使用的 token 信息
+      // 通过 verifyingContract 地址匹配到对应的 token
+      const usedToken = this.supportedTokens.find(t =>
+        payment.paymentPayload?.network?.includes(t.chainId.toString())
+      ) || this.supportedTokens[0];
+
+      // 向 Facilitator 发送 v1 格式（Facilitator 目前只支持 v1）
       const verifyPayload = {
         x402Version: 1,
         paymentPayload: {
           x402Version: 1,
-          scheme: payment.scheme || this.scheme,
-          network: payment.network || this.network,
+          scheme: this.scheme,
+          network: `base-sepolia`, // Facilitator 需要原始网络名
           payload: {
-            signature: `${payment.payment.r}${payment.payment.s.slice(2)}${payment.payment.v.toString(16).padStart(2, '0')}`,
+            signature: signature,
             authorization: {
-              from: payment.payment.from,
-              to: payment.payment.to,
-              value: payment.payment.value,
-              validAfter: payment.payment.validAfter.toString(),
-              validBefore: payment.payment.validBefore.toString(),
-              nonce: payment.payment.nonce
+              from: authData.from,
+              to: this.payToAddress,
+              value: authData.value,
+              validAfter: authData.validAfter.toString(),
+              validBefore: authData.validBefore.toString(),
+              nonce: authData.nonce,
+              memo: memo
             }
           }
         },
         paymentRequirements: {
-          scheme: payment.scheme || this.scheme,
-          network: payment.network || this.network,
-          maxAmountRequired: payment.payment.value,
+          scheme: this.scheme,
+          network: `base-sepolia`,
+          maxAmountRequired: authData.value,
           resource: resource,
-          description:"test",
+          description: "payment",
           mimeType: "application/json",
           maxTimeoutSeconds: 60,
-          // recipient: this.payToAddress,
-          payTo: payment.payment.to,
-          asset: this.currencyAddress,
+          payTo: this.payToAddress,
+          asset: usedToken.address,
           extra: {
-            name: 'YZF Token',
-            version: '1'
+            name: usedToken.domainName,
+            version: usedToken.domainVersion,
+            contractType: usedToken.contractType,
+            allowNegativeBalance: usedToken.contractType === 'DailyLedger' ? true : false
           }
         }
       };
 
       console.log('Verifying payment with facilitator:', this.facilitatorUrl);
-      console.log('Payload:', JSON.stringify(verifyPayload, null, 2));
 
       const response = await axios.post(
         `${this.facilitatorUrl}/verify`,
@@ -175,43 +247,56 @@ class X402Middleware {
   }
 
   /**
-   * 结算支付到链上
+   * 结算支付到链上 (v2)
    */
   async settlePayment(payment, resource) {
     try {
+      const paymentData = payment.paymentPayload?.payload || {};
+      const authData = paymentData.authorization || {};
+
+      const memo = payment.memo || authData.memo || resource;
+      const signature = paymentData.signature;
+
+      // 从客户端支付中提取使用的 token 信息
+      const usedToken = this.supportedTokens.find(t =>
+        payment.paymentPayload?.network?.includes(t.chainId.toString())
+      ) || this.supportedTokens[0];
+
+      // 向 Facilitator 发送 v1 格式
       const settlePayload = {
         x402Version: 1,
         paymentPayload: {
           x402Version: 1,
-          scheme: payment.scheme || this.scheme,
-          network: payment.network || this.network,
+          scheme: this.scheme,
+          network: `base-sepolia`,
           payload: {
-            signature: `${payment.payment.r}${payment.payment.s.slice(2)}${payment.payment.v.toString(16).padStart(2, '0')}`,
+            signature: signature,
             authorization: {
-              from: payment.payment.from,
-              to: payment.payment.to,
-              value: payment.payment.value,
-              validAfter: payment.payment.validAfter.toString(),
-              validBefore: payment.payment.validBefore.toString(),
-              nonce: payment.payment.nonce
+              from: authData.from,
+              to: this.payToAddress,
+              value: authData.value,
+              validAfter: authData.validAfter.toString(),
+              validBefore: authData.validBefore.toString(),
+              nonce: authData.nonce,
+              memo: memo
             }
           }
         },
         paymentRequirements: {
-          scheme: payment.scheme || this.scheme,
-          network: payment.network || this.network,
-          maxAmountRequired: payment.payment.value,
+          scheme: this.scheme,
+          network: `base-sepolia`,
+          maxAmountRequired: authData.value,
           resource: resource,
-          description: "test",
+          description: "payment",
           mimeType: "application/json",
-          payTo: payment.payment.to,
-          maxTimeoutSeconds : 60,
-          // recipient: this.payToAddress,
-          // resource: payment.resource,
-          asset: this.currencyAddress,
+          payTo: this.payToAddress,
+          maxTimeoutSeconds: 60,
+          asset: usedToken.address,
           extra: {
-            name: 'YZF Token',
-            version: '1'
+            name: usedToken.domainName,
+            version: usedToken.domainVersion,
+            contractType: usedToken.contractType,
+            allowNegativeBalance: usedToken.contractType === 'DailyLedger' ? true : false
           }
         }
       };
@@ -230,8 +315,11 @@ class X402Middleware {
       );
 
       console.log('Settlement response:', response.data);
-      console.log(`Transaction hash: ${response.data.transactionHash}`);
-      console.log(`View on explorer: https://sepolia.basescan.org/tx/${response.data.transactionHash}`);
+      const txHash = response.data.transactionHash || response.data.transaction;
+      if (txHash) {
+        console.log(`Transaction hash: ${txHash}`);
+        console.log(`View on explorer: ${usedToken.explorerUrl}/tx/${txHash}`);
+      }
 
       return response.data;
     } catch (error) {

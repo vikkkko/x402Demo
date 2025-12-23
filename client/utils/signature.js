@@ -19,6 +19,7 @@ class SignatureUtils {
       validAfter,
       validBefore,
       nonce,
+      memo,
       domainName,
       domainVersion,
       chainId,
@@ -41,7 +42,8 @@ class SignatureUtils {
         { name: 'value', type: 'uint256' },
         { name: 'validAfter', type: 'uint256' },
         { name: 'validBefore', type: 'uint256' },
-        { name: 'nonce', type: 'bytes32' }
+        { name: 'nonce', type: 'bytes32' },
+        { name: 'memo', type: 'string' }
       ]
     };
 
@@ -52,14 +54,30 @@ class SignatureUtils {
       value: value,
       validAfter: validAfter,
       validBefore: validBefore,
-      nonce: nonce
+      nonce: nonce,
+      memo: memo
     };
 
-    // 签名
-    const signature = await wallet.signTypedData(domain, types, message);
+    // 签名（兼容 ethers v5 和 v6）
+    let signature;
+    if (wallet._signTypedData) {
+      // ethers v5
+      signature = await wallet._signTypedData(domain, types, message);
+    } else {
+      // ethers v6
+      signature = await wallet.signTypedData(domain, types, message);
+    }
 
-    // 拆分签名
-    const sig = ethers.Signature.from(signature);
+    // 拆分签名（兼容 ethers v5 和 v6）
+    let sig;
+    if (ethers.utils && ethers.utils.splitSignature) {
+      // ethers v5
+      sig = ethers.utils.splitSignature(signature);
+    } else {
+      // ethers v6
+      sig = ethers.Signature.from(signature);
+    }
+
     console.log('signature:', signature);
     console.log('sig.v:', sig.v);
     console.log('sig.r:', sig.r);
@@ -71,70 +89,26 @@ class SignatureUtils {
       validAfter: validAfter,
       validBefore: validBefore,
       nonce: nonce,
+      memo: memo,
       v: sig.v,
       r: sig.r,
       s: sig.s
     };
   }
 
-  //ffe30b883937d316d60ad6cfc4bb76f54d8b3d4e394bf4eccf7a54bc175e681b
-  //0cc32733a7f6cf8404f4373fc0cc0c1665a64c81295944074d363a2393e461f4
-  //1b
-
   /**
    * 生成随机 nonce (基于时间戳的 bytes32)
    */
   static generateNonce() {
     const timestamp = Math.floor(Date.now() / 1000);
-    return ethers.zeroPadValue(ethers.toBeHex(timestamp), 32);
-  }
-
-  /**
-   * 获取网络配置
-   */
-  static getNetworkConfig(network) {
-    const configs = {
-      'base-sepolia': {
-        // Besu 私链配置 (支持 EIP-3009)
-        chainId: 1337,
-        rpcUrl: 'http://35.188.26.169:8545',
-        usdcAddress: '0xDE87AF9156a223404885002669D3bE239313Ae33',
-        domainName: 'YZF Token',
-        domainVersion: '1',
-        explorerUrl: 'http://35.188.26.169:8545'  // Besu 私链没有区块浏览器
-      },
-      'base': {
-        chainId: 8453,
-        rpcUrl: 'https://mainnet.base.org',
-        usdcAddress: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
-        domainName: 'USD Coin',
-        domainVersion: '2',
-        explorerUrl: 'https://basescan.org'
-      },
-      'polygon-amoy': {
-        chainId: 80002,
-        rpcUrl: 'https://rpc-amoy.polygon.technology',
-        usdcAddress: '0x41e94eb019c0762f9bfcf9fb1e58725bfb0e7582',
-        domainName: 'USD Coin',
-        domainVersion: '2',
-        explorerUrl: 'https://amoy.polygonscan.com'
-      },
-      'polygon': {
-        chainId: 137,
-        rpcUrl: 'https://polygon-rpc.com',
-        usdcAddress: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
-        domainName: 'USD Coin',
-        domainVersion: '2',
-        explorerUrl: 'https://polygonscan.com'
-      }
-    };
-
-    const config = configs[network];
-    if (!config) {
-      throw new Error(`Unsupported network: ${network}`);
+    // 兼容 ethers v5 和 v6
+    if (ethers.utils && ethers.utils.hexZeroPad) {
+      // ethers v5
+      return ethers.utils.hexZeroPad(ethers.utils.hexlify(timestamp), 32);
+    } else {
+      // ethers v6
+      return ethers.zeroPadValue(ethers.toBeHex(timestamp), 32);
     }
-
-    return config;
   }
 }
 
